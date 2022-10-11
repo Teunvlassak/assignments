@@ -1,0 +1,165 @@
+---
+title: "Assigment - kNN DIY"
+author:
+  - Danny Bannink - Author
+  - Teun Vlassak - Reviewer
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+   html_notebook:
+    toc: true
+    toc_depth: 2
+---
+
+```{r}
+library(tidyverse)
+library(googlesheets4)
+library(class)
+library(caret)
+library(dplyr)
+```
+
+------------------------------------------------------------------------
+
+### Setup library
+
+```{r}
+install.packages("caTools")
+install.packages("XML")
+install.packages("rvest")
+install.packages("GGally")
+library(caTools)
+library(XML)
+library(rvest)
+library(GGally)
+```
+
+# Business Understanding
+
+### An article about the office occupancy concerning the used data in this script has been published. The article can be found at "<https://www.researchgate.net/profile/Luis_Candanedo_Ibarra/publication/285627413_Accurate_occupancy_detection_of_an_office_room_from_light_temperature_humidity_and_CO2_measurements_using_statistical_learning_models/links/5b1d843ea6fdcca67b690c28/Accurate-occupancy-detection-of-an-office-room-from-light-temperature-humidity-and-CO2-measurements-using-statistical-learning-models.pdf>". In this article a situation has been described in which they try to predict the occupancy of an office-room on the basis of several variables, which are: Temperature, Humidity, Light, CO2 and HumidityRatio.
+
+### The goal of the article seems to be that energy usage is to be reduced concerning the occupation of the office-rooms.
+
+# Data Understanding
+
+### In order to understand the data, we first need to take a look at the data.
+
+```{r}
+url <- "https://raw.githubusercontent.com/HAN-M3DM-Data-Mining/assignments/master/datasets/KNN-occupancy.csv"
+rdf <- read.csv(url)
+
+```
+
+### Based on the datatable we can conclude that there or 8143 obs. (rows) of 7 variables. (columns).
+
+```{r}
+str(rdf)
+```
+
+# Data Preparation
+
+### Since the 'date' variable within the data set has no value on doing analysis, the choice is to delete this column.
+
+```{r}
+cdf <- rdf[-1]
+head(cdf)
+```
+
+### The article which was talked about before, speaks of determining the occupancy of the office-rooms. The current estimation of the office occupancy detection has been made in order to save energy usage. Because of this, it is assumed that the outcome of the variable 'Occupancy' should be predicted. Therefore the variable 'Occupancy' has to be labeled by making the datatype a 'factor'.
+
+```{r}
+cntDiag <- table(cdf$Occupancy) # This is the variable we want the outcomes of the tests from
+propDiag <- round(prop.table(cntDiag) * 100 , digits = 1) # Making the table which shows the outcomes
+
+cntDiag # 0 = Unoccupied, 1 = Occupied
+```
+
+```{r}
+propDiag # Here we see the percentages of the occupancies of the office-rooms
+```
+
+
+```{r}
+cdf$Occupancy <- factor(cdf$Occupancy, levels = c("0", "1"), labels = c("Unoccupied", "Occupied")) %>% relevel("Occupied")
+head(cdf, 10) # The variable 'Occupancy' has now been labeled and has gotten the datatype factor
+```
+
+### In order to be able to model these, we need to take a closer look at the statistical values of these variables.
+
+```{r}
+summary(cdf[c("Temperature", "Humidity", "Light", "CO2", "HumidityRatio")])
+```
+
+### To be able to get all 5 variables in 1 model to calculate the distance, the data needs to be 'normalized'. This means that the differences of the values will be brought closer together so the scaling of the values complements eachother for the model. The model which is talked about, is the K-Nearest Neighbor algorithm.
+
+### First the normalization function has to be written
+
+```{r}
+normalize <- function(x) { 
+  return ((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)))}
+```
+
+```{r}
+cdf <- cdf[, c(6,1,2,3,4,5)]
+
+head(cdf)
+```
+
+### Now the new normalization function will be applied to the dataset cdf variables
+
+```{r}
+nCols <- dim(cdf)[[2]]
+
+cdf_n <- cdf[,c(2:nCols)] %>% mutate(across(everything(), normalize))
+
+summary(cdf_n)
+```
+
+```{r}
+summary(cdf)
+```
+
+### The last preperation that has to be done before the modelling phase can start, is splitting the data in a testset and a trainingset.
+
+```{r}
+# Splitting data (from cdf_n, so labels aren't included) intro training and testing data
+train.data <- cdf_n[1:6000,]
+test.data <- cdf_n[6000:8143,]
+```
+
+```{r}
+# Splitting data (from cdf, so only labels are included) intro training and testing data
+train.label <- cdf[1:6000, c("Occupancy")]
+test.label <- cdf[6000:8143, c("Occupancy")]
+```
+
+```{r}
+summary(train.label)
+```
+```{r}
+summary(test.label)
+```
+
+# Modeling
+
+```{r}
+cleanDF_test_pred <- knn(
+  train = as.matrix(train.data), test = as.matrix(test.data),
+  cl = as.matrix(train.label), k = 21)
+head(cleanDF_test_pred)
+```
+```{r}
+summary(cleanDF_test_pred)
+```
+
+
+# Evaluation and Deployment
+### With the confusion table we can conduct if the model worked well.
+```{r}
+confusionMatrix(cleanDF_test_pred, test.label, positive = NULL, dnn = c("Prediction", "True"))
+```
+### Based on the confusionmatrix we can say that de knn-model worked very, very well since there is a accuracy of 96%
+
+text and code here
+
+reviewer adds suggestions for impror improvinving the model
+#Fog the model i would make take less libraries. I have removed some whitespace in the function summary(train. label), the name for head(cleanDF_test_pred1) was not right, it had to be head(cleanDF_test_pred). I think overall it is a nice code that is easy to read.
